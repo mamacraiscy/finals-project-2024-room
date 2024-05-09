@@ -42,6 +42,15 @@ public class CreateRoomRecord {
         // Create a room record to the database
         Room newRoom = createRoom(scanner, roomType); // Use createRoom to construct the room based on roomType
         RoomDao roomDao = new RoomDao(); // Create a DAO instance
+
+//        try {
+//            RoomDao roomDao = new RoomDao(); // Create a DAO instance
+//            roomDao.insertRoom(newRoom);
+//            System.out.println("Room record inserted successfully");
+//        } catch (SQLException e) {
+//            System.out.println("Error inserting room record: " + e.getMessage());
+//        }
+//    }
         try {
             roomDao.saveRoom(newRoom); // Save the room record to the database
             System.out.println("Room record saved successfully.");
@@ -52,7 +61,7 @@ public class CreateRoomRecord {
 
         } catch (SQLException e) {
             System.err.println("Error saving room record: " + e.getMessage());
-//            e.printStackTrace();
+            e.printStackTrace();
         }
 
        scanner.close(); // Close scanner when finished
@@ -183,6 +192,7 @@ public class CreateRoomRecord {
         boolean hasInternetAccess = InputValidator.validateBooleanInput(scanner); // Correct variable initialization
 
         return new Smartroom(roomNumber, capacity, roomStatus, buildingLocation, maintenanceNotes, hasProjector, hasTV, hasInternetAccess); // Correct constructor call
+
     }
 
 }
