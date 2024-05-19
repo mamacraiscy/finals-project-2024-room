@@ -21,24 +21,27 @@ public abstract class Room {
      * These member variables are declared with 'protected' access modifier
      * This means they are accessible within the class itself, subclasses, and the package they are declared in
      */
-    protected String roomNumber; // Encapsulation: Keep details hidden and access them through getters and setters
+    protected String roomName; // Encapsulation: Keep details hidden and access them through getters and setters
     protected int capacity;
     protected boolean roomStatus;
     protected String buildingLocation;
     protected String maintenanceNotes;
     protected String roomType;
     protected boolean hasProjector;
+    protected int numOfChairs;
 
     // Constructor to initialize a 'Room' object
     // It takes several argument to set the initial values for the member variables
-    public Room(String roomNumber, int capacity, boolean roomStatus, String buildingLocation, String maintenanceNotes, String roomType, boolean hasProjector) {
-        this.roomNumber = roomNumber;
+    public Room(String roomNumber, int capacity, boolean roomStatus, String buildingLocation, String maintenanceNotes,
+                String roomType, boolean hasProjector, int numOfChairs) {
+        this.roomName = roomNumber;
         this.capacity = capacity;
         this.roomStatus= roomStatus;
         this.buildingLocation=buildingLocation;
         this.maintenanceNotes = maintenanceNotes;
         this.hasProjector = hasProjector;
         this.roomType= roomType;
+        this.numOfChairs = numOfChairs;
     }
 
     // Abstract method for displaying room information
@@ -49,16 +52,16 @@ public abstract class Room {
     // Getters and setters for encapsulation
     //These methods follow the convention of 'get' for retrieving values and 'set' for updating values
     //They provide controlled access to the member variables following principles of encapsulation
-    public String getRoomNumber() {
-        return roomNumber;
+    public String getRoomName() {
+        return roomName;
     }
 
     /**
      * Setter for the room number for the room
      * this maybe useful for future expansion or certain room management functionalities.
      */
-    public void setRoomNumber(String roomNumber) {
-        this.roomNumber = roomNumber;
+    public void setRoomName(String roomName) {
+        this.roomName = roomName;
     }
 
     public int getCapacity() {
@@ -132,4 +135,11 @@ public abstract class Room {
         this.hasProjector = hasProjector;
     }
 
+    public int getNumOfChairs(){
+        return numOfChairs;
+    }
+
+    public void setNumOfChairs(int numOfChairs){
+        this.numOfChairs=numOfChairs;
+    }
 }
