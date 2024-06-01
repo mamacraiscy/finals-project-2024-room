@@ -1,191 +1,145 @@
 package com.ctu.roommanagementportal.dbservices;
 
-import dao.models.AdminInfo;
-import dao.models.UserInfo;
-import services.reservation.CreateObjects;
 import com.ctu.roommanagementportal.abstraction.Room;
+import com.ctu.roommanagementportal.model.RoomType;
 
 import java.sql.*;
 
-/**
- * Insert PrepareStatement JDBC Example
- *
- * @author Ramesh Fadatare
- *
- */
 public class InsertRecords {
-    private static final String INSERT_USERS_SQL = "INSERT INTO USERINFO (firstName, middleName, lastName, birthDate, homeAddress, nationality, gender, roleAtSchool) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-    private static final String INSERT_ROOMS_SQL = "INSERT INTO ROOMRECORD (roomNumber, capacity, roomStatus, buildingLocation, maintenanceNotes, roomType, hasProjector) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-    private static final String INSERT_BOOKING_SQL = "INSERT INTO BookingDetails (userName, email, date, time, room, bookingID)" +
-            "VALUES (?, ?, ?, ?, ?, ?);";
+    private static final String INSERT_ROOMS_SQL = "INSERT INTO roomrecord (roomName, capacity, roomStatus, buildingLocation, maintenanceNotes, roomType, hasProjector, numOfChairs, whiteBoard, numOfComputers, numOfDesks, hasTV, hasInternetAccess) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    private static final String UPDATE_ROOM_FIELD_SQL = "UPDATE roomrecord SET %s = ? WHERE roomName = ? AND buildingLocation = ?";
+    private static final String CHECK_DUPLICATE_ROOM_SQL = "SELECT COUNT(*) FROM roomrecord WHERE roomName = ? AND buildingLocation = ?";
 
-    private static final String INSERT_ADMIN_SQL = "INSERT INTO AdminInfo (firstName, middleName, lastName, birthDate, street, barangay, municipality, city, zipCode, nationality, gender, roleAtSchool) " +
-            "VALUES (?, ?, ?, ?, ?,?,?,?,?,?,?,?)";
-
-
-    public InsertRecords(){
+    public InsertRecords() {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
         } catch (ClassNotFoundException e) {
-            throw new RuntimeException("Error loading JBCD MySQL Driver", e);
+            throw new RuntimeException("Error loading JDBC MySQL Driver", e);
         }
     }
 
-    public void insertUserRecord(UserInfo userInfo) throws SQLException {
-        System.out.println("Inserting user data to DB");
+    // Method to check for duplicate room name and building location
+    public boolean roomExists(String roomName, String buildingLocation) {
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/roomportaldb?useSSL=false&allowPublicKeyRetrieval=true",
+                "root",
+                "admin123$");
+             PreparedStatement preparedStatement = connection.prepareStatement(CHECK_DUPLICATE_ROOM_SQL)) {
 
+            preparedStatement.setString(1, roomName);
+            preparedStatement.setString(2, buildingLocation);
 
-        // Step 1: Establishing a Connection
-        try (Connection connection = DriverManager
-                .getConnection("jdbc:mysql://localhost:3306/roomportaldb?useSSL=false&allowPublicKeyRetrieval=true", "root", "admin123$");
-
-             // Step 2:Create a statement using connection object
-             PreparedStatement preparedStatement = connection.prepareStatement(INSERT_USERS_SQL)) {
-//            // Set the values
-            preparedStatement.setString(1, userInfo.getFirstName());
-            preparedStatement.setString(2, userInfo.getMiddleName());
-            preparedStatement.setString(3, userInfo.getLastName());
-            preparedStatement.setDate(4, Date.valueOf(userInfo.getBirthDate()));
-            preparedStatement.setString(5, userInfo.getHomeAddress());
-            preparedStatement.setString(6, userInfo.getNationality());
-            preparedStatement.setString(7, userInfo.getGender());
-            preparedStatement.setString(8, userInfo.getRoleAtSchool());
-
-            // Execute the statement
-            int rowsInserted = preparedStatement.executeUpdate();
-            if (rowsInserted > 0) {
-                System.out.println("A new user was inserted successfully!");
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getInt(1) > 0;
+                }
             }
-
         } catch (SQLException e) {
-
-            // print SQL exception information
-            printSQLException(e);
+            e.printStackTrace();
         }
-
-        // Step 4: try-with-resource statement will auto close the connection.
+        return false;
     }
 
-    public void insertRoomRecord(Room roomRecord) throws SQLException {
+    public boolean insertRoomRecord(Room roomRecord) {
         System.out.println("Inserting room data to DB");
 
-        // Step 1: Establishing a Connection
-        try (Connection connection = DriverManager
-                .getConnection("jdbc:mysql://localhost:3306/roomportaldb?useSSL=false&allowPublicKeyRetrieval=true", "root", "admin123$");
+        // Check for duplicates before inserting
+        if (roomExists(roomRecord.getRoomName(), roomRecord.getBuildingLocation())) {
+            return false; // Duplicate found, do not insert
+        }
 
-             // Step 2:Create a statement using connection object
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/roomportaldb?useSSL=false&allowPublicKeyRetrieval=true",
+                "root",
+                "admin123$");
              PreparedStatement preparedStatement = connection.prepareStatement(INSERT_ROOMS_SQL)) {
 
-//            // Set the values
-            preparedStatement.setString(1, roomRecord.getRoomNumber());
+            // Set common attributes
+            preparedStatement.setString(1, roomRecord.getRoomName());
             preparedStatement.setInt(2, roomRecord.getCapacity());
             preparedStatement.setBoolean(3, roomRecord.getRoomStatus());
             preparedStatement.setString(4, roomRecord.getBuildingLocation());
             preparedStatement.setString(5, roomRecord.getMaintenanceNotes());
-            preparedStatement.setString(6, roomRecord.getRoomType());
-            preparedStatement.setBoolean(7, roomRecord.isHasProjector());
+
+            // Set room type-specific attributes
+            setRoomTypeAttributes(preparedStatement, roomRecord);
 
             // Execute the statement
             int rowsInserted = preparedStatement.executeUpdate();
-            if (rowsInserted > 0) {
-                System.out.println("A new room record was inserted successfully!");
-            }
-
+            return rowsInserted > 0;
         } catch (SQLException e) {
-
-            // print SQL exception information
-            printSQLException(e);
+            // Log or handle the exception
+            e.printStackTrace();
+            return false;
         }
-
-        // Step 4: try-with-resource statement will auto close the connection.
     }
 
-    public void insertBookingDetails(CreateObjects bookingRequest) throws SQLException {
-
-        // Step 1: Establishing a Connection
-        try (Connection connection = DriverManager
-                .getConnection("jdbc:mysql://localhost:3306/roomportaldb?useSSL=false&allowPublicKeyRetrieval=true", "root", "admin123$");
-
-             // Step 2:Create a statement using connection object
-             PreparedStatement preparedStatement = connection.prepareStatement(INSERT_BOOKING_SQL)) {
-
-            preparedStatement.setString(1, bookingRequest.getUserName());
-            preparedStatement.setString(2, bookingRequest.getEmail());
-            preparedStatement.setDate(3, bookingRequest.getDate());
-            preparedStatement.setTime(4, bookingRequest.getTime());
-            preparedStatement.setString(5, bookingRequest.getRoom());
-            preparedStatement.setInt(6, bookingRequest.getBookingID());
-
-            // Execute the statement
-            int rowsInserted = preparedStatement.executeUpdate();
-            if (rowsInserted > 0) {
-                System.out.println("A new room record was inserted successfully!");
-            }
-
-        } catch (SQLException e) {
-
-            // print SQL exception information
-            printSQLException(e);
+    private void setRoomTypeAttributes(PreparedStatement preparedStatement, Room roomRecord) throws SQLException {
+        if (roomRecord instanceof RoomType.Classroom) {
+            RoomType.Classroom classroom = (RoomType.Classroom) roomRecord;
+            preparedStatement.setString(6, "Classroom");
+            preparedStatement.setBoolean(7, classroom.isHasProjector());
+            preparedStatement.setInt(8, classroom.getNumOfChairs());
+            preparedStatement.setBoolean(9, classroom.isWhiteboard());
+            preparedStatement.setNull(10, Types.INTEGER);
+            preparedStatement.setNull(11, Types.INTEGER);
+            preparedStatement.setNull(12, Types.BOOLEAN);
+            preparedStatement.setNull(13, Types.BOOLEAN);
+        } else if (roomRecord instanceof RoomType.CompLaboratory) {
+            RoomType.CompLaboratory laboratory = (RoomType.CompLaboratory) roomRecord;
+            preparedStatement.setString(6, "CompLaboratory");
+            preparedStatement.setBoolean(7, laboratory.isHasProjector());
+            preparedStatement.setInt(8, laboratory.getNumOfChairs());
+            preparedStatement.setNull(9, Types.BOOLEAN);
+            preparedStatement.setInt(10, laboratory.getNumOfComputers());
+            preparedStatement.setNull(11, Types.INTEGER);
+            preparedStatement.setNull(12, Types.BOOLEAN);
+            preparedStatement.setNull(13, Types.BOOLEAN);
+        } else if (roomRecord instanceof RoomType.Library) {
+            RoomType.Library library = (RoomType.Library) roomRecord;
+            preparedStatement.setString(6, "Library");
+            preparedStatement.setBoolean(7, library.isHasProjector());
+            preparedStatement.setInt(8, library.getNumOfChairs());
+            preparedStatement.setNull(9, Types.BOOLEAN);
+            preparedStatement.setNull(10, Types.INTEGER);
+            preparedStatement.setInt(11, library.getNumOfDesks());
+            preparedStatement.setNull(12, Types.BOOLEAN);
+            preparedStatement.setNull(13, Types.BOOLEAN);
+        } else if (roomRecord instanceof RoomType.Smartroom) {
+            RoomType.Smartroom smartroom = (RoomType.Smartroom) roomRecord;
+            preparedStatement.setString(6, "Smart room");
+            preparedStatement.setBoolean(7, smartroom.isHasProjector());
+            preparedStatement.setInt(8, smartroom.getNumOfChairs());
+            preparedStatement.setNull(9, Types.BOOLEAN);
+            preparedStatement.setNull(10, Types.INTEGER);
+            preparedStatement.setNull(11, Types.INTEGER);
+            preparedStatement.setBoolean(12, smartroom.isTv());
+            preparedStatement.setBoolean(13, smartroom.isInternetAccess());
+        } else {
+            throw new IllegalArgumentException("Invalid room type.");
         }
-
-        // Step 4: try-with-resource statement will auto close the connection.
     }
 
-    public void insertAdminRecord(AdminInfo adminInfo) throws SQLException {
-        System.out.println("Inserting admin data to DB");
+    public boolean updateRoomField(String roomName, String buildingLocation, String fieldName, Object newValue) {
+        String updateSQL = String.format(UPDATE_ROOM_FIELD_SQL, fieldName);
 
-        // Step 1: Establishing a Connection
-        try (Connection connection = DriverManager
-                .getConnection("jdbc:mysql://localhost:3306/roomportaldb?useSSL=false&allowPublicKeyRetrieval=true", "root", "admin123$");
+        try (Connection connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/roomportaldb?useSSL=false&allowPublicKeyRetrieval=true",
+                "root",
+                "admin123$");
+             PreparedStatement preparedStatement = connection.prepareStatement(updateSQL)) {
 
+            preparedStatement.setObject(1, newValue);
+            preparedStatement.setString(2, roomName);
+            preparedStatement.setString(3, buildingLocation);
 
-             // Step 2:Create a statement using connection object
-             PreparedStatement preparedStatement = connection.prepareStatement(INSERT_ADMIN_SQL)) {
-//            // Set the values
-            preparedStatement.setString(1, adminInfo.getFirstName());
-            preparedStatement.setString(2, adminInfo.getMiddleName());
-            preparedStatement.setString(3, adminInfo.getLastName());
-            preparedStatement.setDate(4, Date.valueOf(adminInfo.getBirthDate()));
-            preparedStatement.setString(5, adminInfo.getStreet());
-            preparedStatement.setString(6, adminInfo.getBarangay());
-            preparedStatement.setString(7, adminInfo.getMunicipality());
-            preparedStatement.setString(8, adminInfo.getCity());
-            preparedStatement.setInt(9, adminInfo.getZIPcode());
-            preparedStatement.setString(10, adminInfo.getNationality());
-            preparedStatement.setString(11, adminInfo.getGender());
-            preparedStatement.setString(12, adminInfo.getroleAtSchool());
-
-            // Execute the statement
-            int rowsInserted = preparedStatement.executeUpdate();
-            if (rowsInserted > 0) {
-                System.out.println("A new user was inserted successfully!");
-            }
-
+            int rowsUpdated = preparedStatement.executeUpdate();
+            return rowsUpdated > 0;
         } catch (SQLException e) {
-
-            // print SQL exception information
-            printSQLException(e);
+            e.printStackTrace();
         }
-
-        // Step 4: try-with-resource statement will auto close the connection.
-    }
-
-    public static void printSQLException(SQLException ex) {
-        for (Throwable e: ex) {
-            if (e instanceof SQLException) {
-                e.printStackTrace(System.err);
-                System.err.println("SQLState: " + ((SQLException) e).getSQLState());
-                System.err.println("Error Code: " + ((SQLException) e).getErrorCode());
-                System.err.println("Message: " + e.getMessage());
-                Throwable t = ex.getCause();
-                while (t != null) {
-                    System.out.println("Cause: " + t);
-                    t = t.getCause();
-                }
-            }
-        }
+        return false;
     }
 }
